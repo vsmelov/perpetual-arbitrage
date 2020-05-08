@@ -118,6 +118,10 @@ It happens because Long-Short trade generated the BTC profit and it has Delta by
 
 In a trading-bot it's better to separate btc-wallet-profit from position and keep AvgEntryPrice for position.
 
+
+
+
+
 \section{Limit wallet BTC amount}
 
 After we make a lot of successful trades with inverse perpetual, we'll get a lot of BTC as a profit on the account.
@@ -152,6 +156,11 @@ IF WalletInverseBTC > Max: \\
 DO NOT LONG when TheoPriceInverse > MarketPriceInverse \\
 DO NOT SHORT when TheoPriceInverse < MarketPriceInverse \\
 
+
+
+
+
+
 \section{Arbitrage algorithm idea}
 
 Let's say, we have a good model which gives predictions of TheoPrice perpetual value. \\
@@ -160,7 +169,7 @@ Let's make an algorithm to trade using the simple criteria: \\
 
 CRITERA = (MarketPriceLinear - TheoPriceLinear) - (MarketPriceInverse - TheoPriceInverse)
 
-\danger different exchanges may have different funding mechanisms, different involved risk and different fees, so strictly speaking, this can affect theoprice.
+\danger different exchanges may have different funding mechanisms, different involved risk and different fees, this may affect theoprice.
 
 IF CRITERIA > SENSITIVITY: SHORT linear, LONG inverse \\
 IF CRITERIA < -SENSITIVITY: LONG linear, SHORT inverse \\
