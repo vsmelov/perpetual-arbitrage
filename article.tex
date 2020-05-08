@@ -1,0 +1,267 @@
+\documentclass{article}
+\usepackage[left=3cm,right=3cm,top=2cm,bottom=2cm]{geometry} % page settings
+\usepackage{fourier}
+\usepackage{listings}
+\usepackage{amsmath} % provides many mathematical environments & tools
+
+\setlength{\parindent}{0mm}
+
+\begin{document}
+
+\title{Perpetual arbitrage}
+\author{Vladimir Smelov}
+\date{\today}
+\maketitle
+
+\section{Abstract}
+This article explains how to do direct/inverse perpetual contracts arbitrage keeping portfolio delta-neutral and having exposure in USDT.
+
+\section{PNL and Delta formulas}
+
+For a direct BTCUSDT contract
+
+\begin{align*}
+Profit^{BTCUSDT}_{linear} = CurrentPrice^{BTC} - AvgEntryPrice^{BTC}
+\end{align*}
+
+So the contract derivatives are
+
+\begin{align*}
+& \Delta^{BTCUSDT}_{linear} = \frac{\partial Profit^{USDT}_{linear}}{\partial CurrentPrice^{BTC}} = 1 \\
+& \Gamma^{BTCUSDT}_{linear} = \frac{\partial \Delta^{BTCUSDT}_{linear}}{\partial CurrentPrice^{BTC}} = 0
+\end{align*}
+
+
+For an inverse BTCUSD contract
+
+\begin{align*}
+& Profit^{BTC}_{inverse} = \frac{1}{AvgEntryPrice^{BTC}} - \frac{1}{CurrentPrice^{BTC}} \\
+& Profit^{USD}_{inverse} = CurrentPrice^{BTC} * Profit^{BTC}_{inverse} \\
+& Profit^{USD}_{inverse} = CurrentPrice^{BTC} * (\frac{1}{AvgEntryPrice^{BTC}} - \frac{1}{CurrentPrice^{BTC}}) \\
+& Profit^{USD}_{inverse} = \frac{CurrentPrice^{BTC}}{AvgEntryPrice^{BTC}} - 1 \\
+\end{align*}
+
+So the contract derivatives are
+
+\begin{align*}
+& \Delta^{BTCUSD}_{inverse} = \frac{\partial Profit^{USD}_{inverse}}{\partial CurrentPrice^{BTC}} = \frac{1}{AvgEntryPrice^{BTC}} \\
+& \Gamma^{BTCUSD}_{inverse} = 0
+\end{align*}
+
+Keep in mind that our profit measured in BTC also has delta by the nature equals to 1.
+
+So total portfolio delta equals to:
+
+
+\begin{align*}
+& \Delta Porfolio = Position^{BTCUSDT}_{linear} * \Delta^{BTCUSDT}_{linear} + Position^{BTCUSD}_{inverse} * \Delta^{BTCUSD}_{inverse} + 1 * Account^{BTC} \\
+& \Delta Porfolio = Position^{BTCUSDT}_{linear} + Position^{BTCUSD}_{inverse} * \frac{1}{AvgEntryPrice^{BTC}} + Account^{BTC} \\
+\end{align*}
+
+\danger We assuming USDT and USD absolutely aligned, what is not completely true. We should handle this in future.
+
+
+
+
+
+\section{Trade effect on delta position}
+
+Let's say, our position is 
+$Position^{BTCUSDT}_{inverse} = s1$ entered for $AvgEntryPrice^{BTC} = p1$ \\
+
+We do a trade with $TradeSize = s2$ and $TradePrice = p2$
+\\
+
+What will be the new value of $AvgEntryPrice^{BTC} = x$ \\
+
+Let's say we will close the total position later, when the price will be $p3$ \\
+
+Then PNL of closing (s1+s2)@p3 with $AvgEntryPrice^{BTC} = x$ should be equals to PNL of closing s1@p3 with $AvgEntryPrice^{BTC} = p1$ + closing s2@p3 with $AvgEntryPrice^{BTC} = p2$ \\
+
+\begin{align*}
+& s1 * (1/p1 - 1/p3) + s2 * (1/p2 - 1/p3) = (s1+s2) * (1/x - 1/p3) \\
+& s1 * 1/p1 + s2 * 1/p2 = (s1+s2) * 1/x \\
+& s1 * 1/p1 + s2 * 1/p2 = (s1+s2) * 1/x \\
+& x = \frac{p1 p2 (s1 + s2)}{p1 s2 + p2 s1} \\
+\end{align*}
+
+Let's note that it's the harmonical average formula. \\
+
+So after a trade our delta position on inverse perpetual will be
+
+\begin{align*}
+& \Delta_{NEW} = (s1 + s2) * 1 / x \\
+& = (s1 + s2) \frac{p1 s2 + p2 s1}{p1 p2 (s1 + s2)} \\
+& = \frac{p1 s2 + p2 s1}{p1 p2} \\
+& = \frac{PreviousAverageEntryPrice * TradeSize + TradePrice * PreviousPosition}{PreviousAverageEntryPrice * TradePrice} \\
+& = \frac{PreviousPosition}{PreviousAverageEntryPrice} + \frac{TradeSize}{TradePrice} \\ 
+& = \Delta PreviosPosition + \Delta Trade
+\end{align*}
+
+so delta-position is additive what is logical :-) \\
+
+\subsection{Long-Short effect on delta position}
+
+What will happen if we, say, long s@p1, then short s@p2 using an inverse perpetual? \\
+
+Our current position is 0. \\
+
+Our BTC profit is $ s * (1/p1-1/p2) $ \\
+
+Our USD profit at the moment of the trade is $ p2 * s * (1/p1-1/p2) = s * (p2/p1 - 1) $ \\
+
+Our USD delta is $ \frac{s}{p1} - \frac{s}{p2} $ \\
+
+How is it turned possible that position is 0, but Delta is not 0? \\
+
+It happens because Long-Short trade generated the BTC profit and it has Delta by itself! \\
+
+In a trading-bot it's better to separate btc-wallet-profit from position and keep AvgEntryPrice for position.
+
+\section{Limit wallet BTC amount}
+
+After we make a lot of successful trades with inverse perpetual, we'll get a lot of BTC as a profit on the account.
+
+The problem is that BTC is very volatile by itself so our profit is volatile.
+
+To avoid this and have exposure in USDT we have two options:
+
+\subsection{withdraw BTC}
+
+Just withdraw BTC manually, exchange it to USDT and send it to linear exchange account :-)
+
+\subsection{cross-exchanges transfer BTC to USDT with trades}
+
+The idea is to use situations when we can trade with total profit = 0, making profit trades with linear perpetual and making equal loss with inverse perpetual. \\
+
+Let's say market prices are distributed around \$1000. \\
+
+Let LinearPrice = \$1100, InversePrice = \$1100, if we do SHORT linear, LONG inverse, and then when prices become normal (near \$1000), we close positions, we'll loose 0.1btc on inverse perpetual, but win \$100 on linear, so this way "cross-exchanges transfering" happen! \\
+
+If we wait for situations when LinearPrice gap even higher than InversePrice we'll even make some total profit. \\
+
+In real situation, for a good model, market prices are distributed around theoretical price. So the logic remains the same. \\
+
+\warning If both prices linear and inverse are higher than theoretical, it may indicate up-trend. Nothing really bad may happen, taking into account that our TotalPosition is delta-neutral and for a good model this should be a rare case (good model makes correct predictions with a higher probability than incorrect). \\
+
+\subsection{BTC wallet limit}
+
+When we see that WalletInverseBTC is high enough (and before we resolve it with one of the methods above), we disable trades which tend to increase InverseProfit. \\
+
+IF WalletInverseBTC > Max: \\
+DO NOT LONG when TheoPriceInverse > MarketPriceInverse \\
+DO NOT SHORT when TheoPriceInverse < MarketPriceInverse \\
+
+\section{Arbitrage algorithm idea}
+
+Let's say, we have a good model which gives predictions of TheoPrice perpetual value. \\
+
+Let's make an algorithm to trade using the simple criteria: \\
+
+CRITERA = (MarketPriceLinear - TheoPriceLinear) - (MarketPriceInverse - TheoPriceInverse)
+
+\danger different exchanges may have different funding mechanisms, different involved risk and different fees, so strictly speaking, this can affect theoprice.
+
+IF CRITERIA > SENSITIVITY: SHORT linear, LONG inverse \\
+IF CRITERIA < -SENSITIVITY: LONG linear, SHORT inverse \\
+
+After we do trades, we always hedge WalletBTC with short/long linear perpetual, so PortfoiloDelta is always 0.
+
+If WalletBTC is high we disable further increasing of BTC (see "BTC wallet limit"), and transfer BTC to USDT account with the method described in "cross-exchanges transfer BTC to USDT with trades".
+
+\section{Arbitrage algorithm example}
+
+Let's say market prices are normally distributed around \$1000.
+
+Let SENSITIVITY=1.
+
+\begin{lstlisting}
+for i in range(20):
+    print(f'time={i}, linear={int(random.gauss(1000, 10))}, inverse={int(random.gauss(1000, 10))}')
+
+time=0, linear=1005, inverse=994
+# CRITERA = (1005-1000) - (994-1000) = 11 -> SHORT linear, LONG inverse
+# short 1btc@1005, long 994usdt@994
+
+time=1, linear=1004, inverse=1011
+# CRITERA = -6 -> LONG linear, SHORT inverse
+# long linear 1btc@1004, short inverse -994usdt@1011,  
+# linear profit = -1usdt
+# inverse profit = 994*(1/994-1/1011) = 0.017btc
+# short linear -0.017btc@1004 to hedge
+
+time=2, linear=989, inverse=995
+# CRITERA = -6 -> LONG linear, SHORT inverse
+# opportunity to "cross-exchange-transfer BTC" with making money on linear
+# short inverse -995usdt@995
+# long linear 1btc@989, so linear position is +1-0.017=0.983 with 
+# linear profit -0.017*(989-1004)=0.255usdt
+# so linear position 0.983btc@989, inverse position -995usdt@995, inverse profit = 0.017btc, linear profit=-1+0.255=-0.745usdt
+
+
+time=3, linear=1002, inverse=1000
+# CRITERA = 2 -> SHORT linear, LONG inverse
+# short linear -0.983btc@1002, linear profit += 0.983*(1002-989)=12.779usdt
+# long inverse 995usdt@1000, inverse profit += -995*(1/995-1/1000) = -0.005btc
+# note, that total usd profit 12.779-0.005*1000=7.779 > 0
+# we could do trades on time=2 for even bigger size and decrease BTC wallet even more
+# linear profit = -0.745+12.779 = 12usdt, inverse profit = 0.017-0.005 = 0.012btc
+# to hedge we do short -0.012btc@1002 <- linear position
+# and inverse position = 0usdt
+
+time=4, linear=987, inverse=1002
+# CRITERIA = -15 -> DO short inverse, long linear
+
+time=5, linear=998, inverse=1005
+# CRITERIA = -7, do not do anything, wait to close position
+
+time=5, linear=1000, inverse=1003
+# CRITERIA = -3, do not do anything, wait to close position
+
+time=6, linear=993, inverse=999
+# CRITERIA = -6, do not do anything, wait to close position
+
+time=7, linear=1010, inverse=1004
+# CRITERIA = 6, DO long inverse, short linear
+# make money on closing the position
+# hedge WalletBTC delta with linear perpetual
+
+time=8, linear=1012, inverse=1011
+# if WalletBTC is big enough we can decrease it \\
+# using "cross-exchange-transfer BTC" method (see above)
+
+...
+\end{lstlisting}
+
+\section{Appendix}
+Exchanges with perpetual contracts:
+
+\begin{itemize}
+\item DueDEX (BTCUSDT linear)
+\item BitMEX (BTCUSD inverse)
+\item Deribit (BTCUSD inverse)
+\item OceanEX (both)
+\item ByBit (both)
+\item Poloniex(BTCUSDT linear)
+\item CoinBene (various direct PPT)
+\item ...
+\end{itemize}
+
+
+Open questions:
+\begin{itemize}
+\item Why exactly there are no linear USD perpetuals? Is there some specific law or something?
+\end{itemize}
+
+
+\section{References}
+\begin{itemize}
+\item https://duedex.zendesk.com/hc/en-us/articles/360046896273-DueDEX-USDT-Perpetual-Contract-FAQ
+\item https://blockonomi.com/perpetual-contracts-bitcoin/
+\item https://forklog.com/likvidatsiya-marzha-i-usdt-kontrakty-torguem-na-bybit/
+\item https://www.bitmex.com/app/pnlGuide
+\item https://help.bybit.com/hc/en-us/articles/900000306086
+\end{itemize}
+
+
+\end{document}
